@@ -1,1 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Newsline: headlines from trusted publishers</title>
+  <meta name="description" content="Latest headlines from trusted news publishers in one place.">
+  <link rel="preconnect" href="https://script.google.com">
+  <link rel="preconnect" href="https://script.googleusercontent.com">
+  <style>
+:root {
+  --bg: #eef1f5; --card: #fff; --ink: #14202c; --muted: #596779; --line: #d8dee6;
+  --accent: #c8102e; --chip: #fff; --chip-on: #14202c; --chip-on-ink: #fff; --sk: #e3e8ee;
+  --serif: Charter, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e141a; --card: #17202a; --ink: #e9eef3; --muted: #9aa7b5; --line: #263341;
+    --accent: #ff6b7f; --chip: #17202a; --chip-on: #e9eef3; --chip-on-ink: #0e141a; --sk: #223040;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 1rem/1.55 var(--sans); }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Header */
+.top { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top__row, .chips { max-width: 76rem; margin: 0 auto; padding-inline: 1rem; }
+.top__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding-block: .75rem .5rem; }
+.brand { margin: 0; font: 800 1.75rem/1 var(--serif); letter-spacing: -.02em; }
+.search { flex: 1 1 14rem; max-width: 22rem; padding: .5rem .9rem; border: 1px solid var(--line); border-radius: 999px; background: var(--card); }
+.chips { display: flex; gap: .5rem; overflow-x: auto; padding-block: .25rem .75rem; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; padding: .35rem .9rem; border: 1px solid var(--line); border-radius: 999px; background: var(--chip); font-size: .875rem; font-weight: 600; cursor: pointer; }
+.chips[hidden] { display: none; }
+.chips--sub { padding-block: 0 .75rem; }
+.chips--sub .chip { padding: .2rem .7rem; font-size: .8125rem; font-weight: 500; background: transparent; }
+.chips--sub .chip[aria-pressed="true"] { background: var(--card); border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); color: var(--ink); }
+.chip[aria-pressed="true"] { background: var(--chip-on); border-color: var(--chip-on); color: var(--chip-on-ink); }
+.fresh { display: block; width: 100%; padding: .55rem 1rem; border: 0; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+.fresh[hidden], .more[hidden] { display: none; }
+.updated { max-width: 76rem; margin: .75rem auto 0; padding-inline: 1rem; color: var(--muted); font-size: .8125rem; }
+
+/* Grid + cards */
+.grid { display: grid; grid-auto-flow: dense; gap: 1rem; max-width: 76rem; margin: 0 auto; padding: .75rem 1rem 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
+.card { position: relative; isolation: isolate; display: flex; flex-direction: column; overflow: hidden; background: var(--card); border: 1px solid var(--line); border-radius: 10px; content-visibility: auto; contain-intrinsic-size: auto 24rem; }
+.card img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: var(--sk); }
+.card__body { display: flex; flex: 1; flex-direction: column; gap: .5rem; padding: .9rem 1rem 1rem; }
+.card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: .15rem .6rem; color: var(--muted); font-size: .8125rem; }
+.card__src { display: inline-flex; align-items: center; gap: .4rem; color: var(--ink); font-weight: 700; }
+.card__src::before { content: ""; width: .55rem; height: .55rem; border-radius: 50%; background: hsl(var(--h, 210) 70% 48%); }
+.card__title { margin: 0; font: 700 1.1875rem/1.28 var(--serif); }
+.card__title a { color: inherit; text-decoration: none; }
+.card__title a::after { content: ""; position: absolute; inset: 0; z-index: 1; }   /* whole card is clickable */
+.card:hover .card__title a { text-decoration: underline; text-underline-offset: .2em; }
+.card__text { margin: 0; color: var(--muted); font-size: .9375rem; white-space: pre-line; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.card.is-open .card__text { display: block; }
+.card__foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: auto; padding-top: .25rem; color: var(--muted); font-size: .8125rem; }
+.card__more { position: relative; z-index: 2; padding: .3rem 0; border: 0; background: none; color: var(--accent); font-weight: 600; text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
+
+/* Lead story: image fills the card, text sits on a scrim */
+.card--hero { min-height: 22rem; border: 0; color: #fff; }
+.card--hero img { position: absolute; inset: 0; z-index: -1; height: 100%; aspect-ratio: auto; }
+.card--hero .card__body { flex: 0 0 auto; margin-top: auto; padding-top: 4rem; background: linear-gradient(transparent, rgba(0, 0, 0, .88)); }
+.card--hero .card__title { font-size: clamp(1.4rem, 3vw, 2rem); line-height: 1.2; }
+.card--hero .card__meta, .card--hero .card__text, .card--hero .card__foot { color: #e3e9ef; }
+.card--hero .card__src { color: #fff; }
+@media (min-width: 52rem) { .card--hero { grid-column: span 2; grid-row: span 2; min-height: 30rem; } }
+
+/* Loading skeleton */
+.skeleton { min-height: 18rem; }
+.sk { background: var(--sk); animation: pulse 1.4s ease-in-out infinite; }
+.sk-img { aspect-ratio: 16 / 9; }
+.sk-fill { position: absolute; inset: 0; }
+.sk-line { height: .9rem; margin: 1rem 1rem 0; border-radius: 4px; }
+.sk-short { width: 55%; }
+@keyframes pulse { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .sk { animation: none; } }
+
+.more-wrap { display: flex; justify-content: center; padding: 0 1rem 1.5rem; }
+.more, .msg button { padding: .6rem 1.4rem; border: 1px solid var(--ink); border-radius: 999px; background: none; font-weight: 600; cursor: pointer; }
+.msg { grid-column: 1 / -1; padding: 3rem 1rem; text-align: center; color: var(--muted); }
+.foot { max-width: 76rem; margin: 0 auto; padding: 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .8125rem; }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="top__row">
+      <h1 class="brand">Newsline</h1>
+      <input id="search" class="search" type="search" placeholder="Search headlines" aria-label="Search headlines" autocomplete="off">
+    </div>
+    <nav id="chips" class="chips" aria-label="Filter by publisher"></nav>
+    <nav id="cats" class="chips chips--sub" aria-label="Filter by category" hidden></nav>
+    <button id="fresh" class="fresh" type="button" hidden>New stories are available. Show them</button>
+  </header>
+
+  <p id="updated" class="updated"></p>
+
+  <!-- Skeletons are plain HTML so they paint before JavaScript runs. -->
+  <main id="news-container" class="grid" aria-busy="true" aria-live="polite">
+    <div class="card card--hero skeleton" aria-hidden="true"><div class="sk sk-fill"></div></div>
+    <div class="card skeleton" aria-hidden="true"><div class="sk sk-img"></div><div class="sk sk-line"></div><div class="sk sk-line sk-short"></div></div>
+    <div class="card skeleton" aria-hidden="true"><div class="sk sk-img"></div><div class="sk sk-line"></div><div class="sk sk-line sk-short"></div></div>
+    <div class="card skeleton" aria-hidden="true"><div class="sk sk-img"></div><div class="sk sk-line"></div><div class="sk sk-line sk-short"></div></div>
+    <div class="card skeleton" aria-hidden="true"><div class="sk sk-img"></div><div class="sk sk-line"></div><div class="sk sk-line sk-short"></div></div>
+  </main>
+  <div class="more-wrap"><button id="more" class="more" type="button" hidden>Show more stories</button></div>
+
+  <footer class="foot">Headlines, excerpts and images belong to their publishers. Select a story to read it on the original site.</footer>
+  <noscript><p class="msg">Newsline needs JavaScript to load stories.</p></noscript>
+<script>
+(() => {
+  'use strict';
+
+  const CONFIG = {
+    // Paste your Apps Script Web App URL here (it ends with /exec).
+    WEB_APP_URL: 'PASTE_WEB_APP_URL_HERE',
+    TTL_MS: 10 * 60 * 1000,        // match CONFIG.REFRESH_MINUTES in Code.gs
+    CACHE_KEY: 'newsline:v2',
+    PAGE: 24                       // stories per "Show more" step
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const container = $('news-container'), chips = $('chips'), cats = $('cats'), search = $('search');
+  const fresh = $('fresh'), more = $('more'), updated = $('updated');
+  const state = { data: { articles: [] }, source: 'All', category: 'All', query: '', shown: CONFIG.PAGE };
+  let pending = null, lastCheck = Date.now();
+
+  /* ---------- data ---------- */
+  const readCache = () => { try { return JSON.parse(sessionStorage.getItem(CONFIG.CACHE_KEY)); } catch { return null; } };
+  const writeCache = (data) => { try { sessionStorage.setItem(CONFIG.CACHE_KEY, JSON.stringify({ t: Date.now(), data })); } catch {} };
+
+  async function fetchData() {
+    if (!/^https:\/\/script\.google\.com\/.+\/exec/.test(CONFIG.WEB_APP_URL)) {
+      throw new Error('Set WEB_APP_URL to your Apps Script Web App URL (it ends with /exec).');
+    }
+    // A new ?v= value every TTL window stops the browser serving an older copy. No force-cache here:
+    // Apps Script answers with a redirect that must not be replayed from the HTTP cache.
+    const bucket = Math.floor(Date.now() / CONFIG.TTL_MS);
+    const res = await fetch(CONFIG.WEB_APP_URL + (CONFIG.WEB_APP_URL.includes('?') ? '&' : '?') + 'v=' + bucket);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  }
+
+  async function getData() {
+    const cached = readCache();
+    if (cached && Date.now() - cached.t < CONFIG.TTL_MS) return cached.data;
+    try { const data = await fetchData(); writeCache(data); return data; }
+    catch (err) { if (cached) return cached.data; throw err; }
+  }
+
+  /* ---------- helpers (textContent only: feed text can never inject HTML) ---------- */
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text) n.textContent = text; return n; };
+  const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? u.replace(/^http:\/\//i, 'https://') : '');
+  const hue = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+  function ago(s) {
+    const t = Date.parse(s);
+    if (!t) return '';
+    const m = Math.min(0, Math.round((t - Date.now()) / 60000));
+    if (m > -60) return rtf.format(m, 'minute');
+    const h = Math.round(m / 60);
+    if (h > -24) return rtf.format(h, 'hour');
+    const d = Math.round(h / 24);
+    return d > -7 ? rtf.format(d, 'day') : new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  /* ---------- rendering ---------- */
+  function buildCard(a, hero) {
+    const card = el('article', hero ? 'card card--hero' : 'card');
+    const src = safeUrl(a.image_url);
+    if (src) {
+      const img = document.createElement('img');
+      img.loading = 'lazy'; img.decoding = 'async';
+      img.referrerPolicy = 'no-referrer';          // many publisher CDNs reject hotlinks that send a referrer
+      img.width = 640; img.height = 360;           // reserves space, prevents layout shift
+      img.alt = '';                                // decorative: the headline carries the meaning
+      img.src = src;
+      img.addEventListener('error', () => img.remove(), { once: true });
+      card.append(img);
+    }
+
+    const meta = el('div', 'card__meta');
+    const badge = el('span', 'card__src', a.source || '');
+    badge.style.setProperty('--h', hue(a.source || ''));
+    meta.append(badge);
+    const when = ago(a.published_date);
+    if (when) { const t = el('time', null, when); t.dateTime = new Date(a.published_date).toISOString(); meta.append(t); }
+
+    const title = el('h2', 'card__title');
+    const href = safeUrl(a.url);
+    if (href) {
+      const link = el('a', null, a.title);
+      link.href = href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+      title.append(link);
+    } else title.textContent = a.title;
+
+    const foot = el('div', 'card__foot');
+    foot.append(el('span', null, [a.author, a.category].filter(Boolean).join(', ')));
+    if (!href && (a.content || '').length > 220) {   // own stories expand in place
+      const btn = el('button', 'card__more', 'Read more');
+      btn.type = 'button'; btn.setAttribute('aria-expanded', 'false');
+      foot.append(btn);
+    }
+
+    const body = el('div', 'card__body');
+    body.append(meta, title);
+    if (a.content) body.append(el('p', 'card__text', a.content));
+    body.append(foot);
+    card.append(body);
+    return card;
+  }
+
+  function showMessage(text, retry) {
+    const box = el('div', 'msg', text);
+    if (retry) {
+      const btn = el('button', null, 'Try again');
+      btn.type = 'button'; btn.addEventListener('click', retry);
+      box.append(document.createElement('br'), btn);
+    }
+    container.replaceChildren(box);
+    container.removeAttribute('aria-busy');
+    more.hidden = true;
+  }
+
+  function filtered() {
+    const q = state.query.trim().toLowerCase();
+    return state.data.articles.filter((a) =>
+      (state.source === 'All' || a.source === state.source) &&
+      (state.category === 'All' || a.category === state.category) &&
+      (!q || (a.title + ' ' + (a.content || '') + ' ' + a.source).toLowerCase().includes(q)));
+  }
+
+  function renderChips() {
+    const counts = {};
+    state.data.articles.forEach((a) => { counts[a.source] = (counts[a.source] || 0) + 1; });
+    chips.replaceChildren(...['All', ...Object.keys(counts)].map((name) => {
+      const b = el('button', 'chip', name);
+      b.type = 'button'; b.dataset.source = name;
+      b.setAttribute('aria-pressed', String(name === state.source));
+      return b;
+    }));    renderCats();
+  }
+
+  // Category chips follow the selected publisher; hidden when there is only one category.
+  function renderCats() {
+    const names = [...new Set(state.data.articles
+      .filter((a) => state.source === 'All' || a.source === state.source)
+      .map((a) => a.category).filter(Boolean))];
+    if (!names.includes(state.category)) state.category = 'All';
+    cats.hidden = names.length < 2;
+    cats.replaceChildren(...['All', ...names].map((name) => {
+      const b = el('button', 'chip', name === 'All' ? 'All categories' : name);
+      b.type = 'button'; b.dataset.category = name;
+      b.setAttribute('aria-pressed', String(name === state.category));
+      return b;
+    }));
+  }
+
+  function render() {
+    const list = filtered();
+    if (!list.length) return showMessage(state.data.articles.length ? 'No stories match your search.' : 'No stories yet. Check back soon.');
+    const frag = document.createDocumentFragment();
+    list.slice(0, state.shown).forEach((a, i) => frag.append(buildCard(a, i === 0 && !!safeUrl(a.image_url))));
+    container.replaceChildren(frag);
+    container.removeAttribute('aria-busy');
+    more.hidden = list.length <= state.shown;
+    if (state.data.generatedAt) {
+      updated.textContent = 'Updated ' + new Date(state.data.generatedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+  }
+
+  const reset = () => { state.shown = CONFIG.PAGE; render(); };
+
+  /* ---------- events ---------- */
+  chips.addEventListener('click', (e) => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    state.source = b.dataset.source; state.category = 'All';
+    renderChips(); reset();
+  });
+  cats.addEventListener('click', (e) => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    state.category = b.dataset.category;
+    renderCats(); reset();
+  });
+  let timer;
+  search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { state.query = search.value; reset(); }, 150); });
+  more.addEventListener('click', () => { state.shown += CONFIG.PAGE; render(); });
+  container.addEventListener('click', (e) => {
+    const btn = e.target.closest('.card__more');
+    if (!btn) return;
+    const open = btn.closest('.card').classList.toggle('is-open');
+    btn.textContent = open ? 'Show less' : 'Read more';
+    btn.setAttribute('aria-expanded', String(open));
+  });
+
+  /* ---------- live refresh: check for new stories while the tab is open ---------- */
+  async function checkForNew() {
+    lastCheck = Date.now();
+    try {
+      const data = await fetchData();
+      if (data.generatedAt && data.generatedAt !== state.data.generatedAt) { pending = data; fresh.hidden = false; }
+    } catch { /* stay quiet; try again next interval */ }
+  }
+  fresh.addEventListener('click', () => {
+    state.data = pending; writeCache(pending); pending = null; fresh.hidden = true;
+    renderChips(); reset(); window.scrollTo({ top: 0 });
+  });
+  setInterval(checkForNew, CONFIG.TTL_MS);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - lastCheck > CONFIG.TTL_MS) checkForNew(); });
+
+  function init() {
+    getData().then((data) => {
+      state.data = { ...data, articles: Array.isArray(data) ? data : data.articles || [] };
+      renderChips(); render();
+    }).catch((err) => showMessage(/WEB_APP_URL/.test(err.message) ? err.message : "Couldn't load stories. Check your connection and try again.", init));
+  }
+  init();
+})();
+</script>
+</body>
+</html>
